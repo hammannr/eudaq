@@ -180,7 +180,7 @@ void AidaTluControl::SetTLUThreshold(std::vector<double> val, std::vector<bool> 
     int i = 0;
     bool done = false;
 
-    if (connection[0] & (!done)) {
+    if (connection[0] && (!done)) {
         if (mode.compare("second") != 0) {
             m_tlu->SetThresholdValue(0, float(val[i]) , m_verbose);
             i++;
@@ -192,7 +192,7 @@ void AidaTluControl::SetTLUThreshold(std::vector<double> val, std::vector<bool> 
             mode = "first";
         }
     }
-    if (connection[1] & (!done)) {
+    if (connection[1] && (!done)) {
         if (mode.compare("second") != 0) {
             m_tlu->SetThresholdValue(1, float(val[i]) , m_verbose);
             i++;
@@ -204,7 +204,7 @@ void AidaTluControl::SetTLUThreshold(std::vector<double> val, std::vector<bool> 
             mode = "first";
         }
     }
-    if (connection[2]& (!done)) {
+    if (connection[2] && (!done)) {
         if (mode.compare("second") != 0) {
             m_tlu->SetThresholdValue(2, float(val[i]) , m_verbose);
             i++;
@@ -216,7 +216,7 @@ void AidaTluControl::SetTLUThreshold(std::vector<double> val, std::vector<bool> 
             mode = "first";
         }
     }
-    if (connection[3]& (!done)) {
+    if (connection[3] && (!done)) {
         if (mode.compare("second") != 0) {
             m_tlu->SetThresholdValue(3, float(val[i]) , m_verbose);
             i++;
@@ -228,7 +228,7 @@ void AidaTluControl::SetTLUThreshold(std::vector<double> val, std::vector<bool> 
             mode = "first";
         }
     }
-    if (connection[4]& (!done)) {
+    if (connection[4] && (!done)) {
         if (mode.compare("second") != 0) {
             m_tlu->SetThresholdValue(4, float(val[i]) , m_verbose);
             i++;
@@ -240,7 +240,7 @@ void AidaTluControl::SetTLUThreshold(std::vector<double> val, std::vector<bool> 
             mode = "first";
         }
     }
-    if (connection[5]& (!done)) {
+    if (connection[5] && (!done)) {
         if (mode.compare("second") != 0) {
             m_tlu->SetThresholdValue(5, float(val[i]) , m_verbose);
             i++;

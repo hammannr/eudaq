@@ -31,6 +31,7 @@
 #include <TF1.h>
 #include <TLatex.h>
 #include <TLegend.h>
+#include <TGraph2D.h>
 
 
 //#include "gnuplot-iostream.h"
@@ -40,13 +41,14 @@ public:
     AidaTluControl();
     void DoStartUp();
     void SetPMTVoltage(double voltage);
+    void SetPMTVoltage(std::vector<double> voltage);
     void SetTLUThreshold(double threshold);
     void SetTLUThreshold(std::vector<double> threshold, std::vector<bool> connection, std::string mode);
     std::vector<std::vector<double> > GetOptimalThreshold(std::string filename);
     void PlotTrigger(std::string filename);
     std::vector<double> MeasureRate(std::vector<bool> connection);
     void WriteOutputFile(std::string filename, double voltage, std::vector<std::vector<double>> rates, std::vector<double> thresholds);
-    void WriteOutputFileTrigger(int channel, std::string filename, double voltage, std::vector<std::vector<double>> thresholdsTrigger, std::vector<std::vector<std::vector<double>>> ratesTrigger, std::vector<double> optimalThresholds);
+    void WriteOutputFileTrigger(int channel, std::string filename, std::vector<double> voltage, std::vector<std::vector<double>> thresholdsTrigger, std::vector<std::vector<std::vector<double>>> ratesTrigger, std::vector<double> optimalThresholds);
     void WriteParameters(int in_numThresholdValues, int in_numTriggerInputs, int in_time, int in_numStepsTrigger);
     bool flagPlateauError;
 
@@ -170,6 +172,10 @@ void AidaTluControl::SetPMTVoltage(double val){
     m_tlu->pwrled_setVoltages(float(val), float(val), float(val), float(val), m_verbose);
 }
 
+void AidaTluControl::SetPMTVoltage(std::vector<double> voltage){
+    m_tlu->pwrled_setVoltages(float(voltage[0]), float(voltage[1]), float(voltage[2]), float(voltage[3]), m_verbose);
+}
+
 // Set TLU threshold
 void AidaTluControl::SetTLUThreshold(double val){
     m_tlu->SetThresholdValue(7, float(val) , m_verbose); //all channels
@@ -177,7 +183,7 @@ void AidaTluControl::SetTLUThreshold(double val){
 
 // Set TLU threshold (individual values and only connected channels)
 void AidaTluControl::SetTLUThreshold(std::vector<double> val, std::vector<bool> connection, std::string mode){
-// mode first: Writes voltage only to first connected
+    // mode first: Writes voltage only to first connected
     int i = 0;
     bool done = false;
 
@@ -618,8 +624,10 @@ void AidaTluControl::PlotTrigger(std::string filename){
     // Open File with data and write them into arrays
     std::ifstream infile;
 
+    std::cout << "Numer of threshold steps:  " << numStepsTrigger << std::endl;
     Double_t threshold[numTriggerInputs][numStepsTrigger];
     Double_t rate[numTriggerInputs][numStepsTrigger];
+    Double_t correctionFactor;
 
     for (int channel = 0; channel < numTriggerInputs; channel++){
 
@@ -646,9 +654,13 @@ void AidaTluControl::PlotTrigger(std::string filename){
                             threshold[channel][lineCounter - skiplines] = std::stod(val);
                             //std::cout<< "Thr  "<<std::stod(val) << std::endl;
                         }
+                        // get rate of first channel as normalization for each point
+                        if (i == 1){
+                            correctionFactor = std::stod(val);
+                        }
                         // Take PostVetoTrigger:
                         else if (i == numTriggerInputs + 1){
-                            rate[channel][lineCounter - skiplines] = std::stod(val);
+                            rate[channel][lineCounter - skiplines] = std::stod(val) / correctionFactor;
                             //std::cout<< "Trig  "<<std::stod(val) << std::endl;
                         }
                     }
@@ -700,6 +712,9 @@ void AidaTluControl::PlotTrigger(std::string filename){
     std::string exportFile = filename + (std::string)"_OptimizeTrigger.pdf";
     c1->SaveAs(exportFile.c_str());
 
+    exportFile = filename + (std::string)"_OptimizeTrigger.root";
+    c1->SaveAs(exportFile.c_str());
+
     std::cout << "Enter 'q' to continue" << std::endl;
     int k;
     std::cin >> k;
@@ -739,21 +754,29 @@ void AidaTluControl::WriteOutputFile(std::string filename, double voltage, std::
 }
 
 
-void AidaTluControl::WriteOutputFileTrigger(int channel, std::string filename, double voltage, std::vector<std::vector<double>> thresholdsTrigger, std::vector<std::vector<std::vector<double>>> ratesTrigger, std::vector<double> optimalThresholds){
+void AidaTluControl::WriteOutputFileTrigger(int channel, std::string filename, std::vector<double> voltage, std::vector<std::vector<double>> thresholdsTrigger, std::vector<std::vector<std::vector<double>>> ratesTrigger, std::vector<double> optimalThresholds){
     std::ofstream outFile;
     outFile.open (filename + "_OptimizeTrigger_" + std::to_string(channel+1) + ".txt");
 
     auto now = std::chrono::system_clock::now();
     std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
     outFile << "Date:\t" << std::ctime(&timeNow) << "\n";
-    outFile << "PMT Voltage [V]:\t   " << voltage << "\n";
-    outFile << "Acquisition Time [s]\t:   " << time << "\n";
-    outFile << "Optimal Thresholds [V]\t:   ";
-    for (int channel = 0; channel < numTriggerInputs; channel++){
-        outFile <<"Channel " << channel + 1<< ")  " << optimalThresholds[channel] << "\n" << "\n";
-    }
+    outFile << "Acquisition Time [s]:\t   " << time << "\n";
 
-    outFile << "Thr " << channel+1 << " [V]\t\t";
+    outFile << "Optimal PMT Voltages [V]:\t   ";
+    for (int channel = 0; channel < numTriggerInputs; channel++){
+        outFile <<"Channel " << channel + 1<< ")  " << voltage[channel] << "\t";
+    }
+    outFile << "\n";
+
+
+    outFile << "Optimal Thresholds [V]:\t   ";
+    for (int channel = 0; channel < numTriggerInputs; channel++){
+        outFile <<"Channel " << channel + 1<< ")  " << optimalThresholds[channel] << "\t";
+    }
+    outFile << "\n\n";
+
+    outFile << "Thr " << channel+1 << " [V]\t";
     for (int channel_ = 0; channel_ < numTriggerInputs; channel_++){
         outFile << "PMT " << channel_+1 << " [Hz]\t";
     }
@@ -782,6 +805,15 @@ int main(int /*argc*/, char **argv) {
     eudaq::Option<std::string> name(op, "f", "filename", "output", "string", "filename");
     eudaq::Option<std::string> con(op, "c", "connectionmap", "111100", "string", "connection map");
     eudaq::Option<bool> tluOn(op, "tlu", "tluconnected", true, "bool", "tlu connected");
+    eudaq::Option<bool> optTrig(op, "opt", "optimizetrig", false, "bool", "optimize for trigger rates");
+    eudaq::Option<bool> optPlot(op, "optplot", "optplot", false, "bool", "only plot optimization stuff");
+    eudaq::Option<int> trigNum(op, "otn", "optimizetrignum", 11, "int", "number of steps for trigger optimization");
+    //eudaq::Option<bool> setOpt(op, "setopt", "setoptparams", false, "bool", "set optimal parameters");
+    //eudaq::Option<std::vector<double>> voltOpt(op, "ov", "optpmtvoltages", (0.8,0.8,0.8,0.8), "vector double", "optimal PMT voltages [V]");
+    //eudaq::Option<std::vector<double>> thrOpt(op, "ot", "optthresholds", (-0.08,-0.08,-0.08,-0.08), "vector double", "optimal threshold values [V]");
+    //eudaq::Option<std::vector<double>> thrMinOpt(op, "otl", "optthresholdslow", (-0.1,-0.1,-0.1,-0.1), "vector double", "optimal threshold values low [V]");
+    //eudaq::Option<std::vector<double>> thrMaxOpt(op, "oth", "optthresholdshigh", (-0.06,-0.06,-0.06,-0.06), "vector double", "optimal threshold values high [V]");
+
 
     try{
         op.Parse(argv);
@@ -791,8 +823,9 @@ int main(int /*argc*/, char **argv) {
     }
 
     // Threshold in [-1.3V,=1.3V] with 40e-6V presision
-    int numStepsTrigger = 11; //TODO: Remove hardcode
+    int numStepsTrigger = trigNum.Value();
 
+    bool optimizationPlot = optPlot.Value();
 
     double thresholdMin = thrMin.Value();
     double thresholdMax = thrMax.Value();
@@ -840,6 +873,8 @@ int main(int /*argc*/, char **argv) {
 
     std::vector<std::vector<double>> rates(numThresholdValues, std::vector<double>(numTriggerInputs + 2));
     bool tluConnected = tluOn.Value();
+    bool optimizeTriggerRates = optTrig.Value();
+
 
     // Define standard parameters for reference channel:
     //double standardVoltage = 0.8;
@@ -849,42 +884,7 @@ int main(int /*argc*/, char **argv) {
     /////////////////////////////////////////////////////////////////
     // Determine optimal Threshold values
     /////////////////////////////////////////////////////////////////
-/*
-    if(tluConnected){
-        myTlu.DoStartUp();
-        double referenceValFirst = 1.;
-        double referenceValSecond = 1.;
-        for (int i = 0; i < numThresholdValues; i++){
-            myTlu.SetPMTVoltage(voltage);
 
-            myTlu.SetTLUThreshold(thresholds[i]);
-            myTlu.SetTLUThreshold(standardThreshold, connectionBool, "first");
-
-            rates[i] = myTlu.MeasureRate(connectionBool);
-            if(i == 0) {
-                if (rates[i][0] != 0) referenceValFirst = rates[i][0];
-                else std::cout << "First  Rate 0! Correction will not work properly!" << std::endl;
-            }
-
-            for (int j = 0; j < numTriggerInputs; j++){
-                rates[i][j] *= referenceValFirst / rates[i][0];    
-            }
-	    std::cout << "Correcting all values by "<< referenceValFirst / rates[i][0]<<std::endl;
-
-            // Repeat Measurement for first input, now the second input is constant
-            myTlu.SetTLUThreshold(thresholds[i]);
-            myTlu.SetTLUThreshold(standardThreshold, connectionBool, "second");
-            
-	    
-	    rates[i][0] = myTlu.MeasureRate(connectionBool)[0];
-            if(i == 0) {
-                if (rates[i][1] != 0) referenceValSecond = rates[i][1];
-                else std::cout << "Second  Rate 0! Correction will not work properly!" << std::endl;
-            }
-            rates[i][0] *= referenceValSecond / rates[i][1];
-            std::cout << "Correcting first value by "<< referenceValSecond / rates[i][1]<<std::endl;
-        }
-    }*/
 
     if(tluConnected){
         myTlu.DoStartUp();
@@ -902,7 +902,6 @@ int main(int /*argc*/, char **argv) {
         // Repeat Measurement for first input, now the second input is constant
         for (int i = 0; i < numThresholdValues; i++){
             myTlu.SetPMTVoltage(voltage);
-
             myTlu.SetTLUThreshold(thresholds[i]);
             myTlu.SetTLUThreshold(standardThreshold, connectionBool, "second");
 
@@ -913,13 +912,12 @@ int main(int /*argc*/, char **argv) {
     }
 
 
+    std::vector<double> optimalVoltages;
+    std::vector<double> optimalThresholds;
+    std::vector<double> thresholdMinOpt;
+    std::vector<double> thresholdMaxOpt;
 
-    if(! tluConnected){
-        std::vector<double> optimalThresholds;
-        std::vector<double> thresholdMinOpt;
-        std::vector<double> thresholdMaxOpt;
-
-
+    if((! tluConnected) && (!optimizeTriggerRates)){
         std::vector<std::vector<double>> optimalReturn = myTlu.GetOptimalThreshold(filename);
 
         optimalThresholds = optimalReturn[0];
@@ -927,7 +925,7 @@ int main(int /*argc*/, char **argv) {
         thresholdMaxOpt = optimalReturn[2];
 
         for (int i = 0; i < thresholdMinOpt.size(); i++){
-            std::cout << thresholdMinOpt[i] << "   " << optimalThresholds[i] << "   " << thresholdMaxOpt[i] <<std::endl;
+            std::cout << "Plateau:  "<< thresholdMinOpt[i] << " -- " << optimalThresholds[i] << " -- " << thresholdMaxOpt[i] <<std::endl;
         }
 
 
@@ -938,46 +936,64 @@ int main(int /*argc*/, char **argv) {
         }
         std::cout << "__________________________" << std::endl;
 
-
-
-        //////////////////////////////////////////////////////////////////////////
-        // Vary threshold of single channel and see how TriggerRate changes
-        //////////////////////////////////////////////////////////////////////////
-
-/*
-        if(tluConnected && (! myTlu.flagPlateauError)){
-
-
-            //three dimensional vector [numTriggerInputs] [numStepsTrigger] [numTriggerInputs+2]
-            std::vector<std::vector<std::vector<double>>> ratesTrigger(numTriggerInputs, std::vector<std::vector<double>>(numStepsTrigger, std::vector<double>(numTriggerInputs + 2)));
-            std::vector<std::vector<double>> thresholdsTrigger(numTriggerInputs, std::vector<double>(numStepsTrigger));
-
-            for (int channelNo = 0; channelNo < numTriggerInputs; channelNo++){
-                for (int step = 0; step < numStepsTrigger; step++){
-                    thresholdsTrigger[channelNo][step] = thresholdMinOpt[channelNo] + step * (thresholdMaxOpt[channelNo] - thresholdMinOpt[channelNo]) / (numStepsTrigger-1);
-                }
-            }
-
-            for (int channelNo = 0; channelNo < numTriggerInputs; channelNo++){
-                std::vector<double> varThresholds = optimalThresholds;
-
-                for (int step = 0; step < numStepsTrigger; step++){
-                    varThresholds[channelNo] = thresholdsTrigger[channelNo][step];
-                    myTlu.SetPMTVoltage(voltage);
-                    myTlu.SetTLUThreshold(varThresholds, connectionBool, "normal");
-                    ratesTrigger[channelNo][step] = myTlu.MeasureRate(connectionBool);
-                }
-            }
-
-            for (int channel = 0; channel < numTriggerInputs; channel++){
-                myTlu.WriteOutputFileTrigger(channel, filename, voltage, thresholdsTrigger, ratesTrigger, optimalThresholds);
-            }
-
-
-
-            myTlu.PlotTrigger(filename);
-        }*/
     }
+
+    //////////////////////////////////////////////////////////////////////////
+    // Vary threshold of single channel and see how TriggerRate changes
+    //////////////////////////////////////////////////////////////////////////
+
+
+    if(optimizeTriggerRates){
+        myTlu.DoStartUp();
+        optimalVoltages = {0.9, 0.95, 0.9, 0.85};
+        optimalThresholds = {-0.064, -0.078, -0.078, -0.068};
+        thresholdMinOpt = {-0.078, -0.107, -0.103, -0.098};
+        thresholdMaxOpt = {-0.049, -0.053, -0.054, -0.039};
+
+        //three dimensional vector [numTriggerInputs] [numStepsTrigger] [numTriggerInputs+2]
+        std::vector<std::vector<std::vector<double>>> ratesTrigger(numTriggerInputs, std::vector<std::vector<double>>(numStepsTrigger, std::vector<double>(numTriggerInputs + 2)));
+        std::vector<std::vector<double>> thresholdsTrigger(numTriggerInputs, std::vector<double>(numStepsTrigger));
+
+        for (int channelNo = 0; channelNo < numTriggerInputs; channelNo++){
+            for (int step = 0; step < numStepsTrigger; step++){
+                thresholdsTrigger[channelNo][step] = thresholdMinOpt[channelNo] + step * (thresholdMaxOpt[channelNo] - thresholdMinOpt[channelNo]) / (numStepsTrigger-1);
+            }
+        }
+
+        for (int channelNo = 0; channelNo < numTriggerInputs; channelNo++){
+            std::vector<double> varThresholds = optimalThresholds;
+
+            for (int step = 0; step < numStepsTrigger; step++){
+                varThresholds[channelNo] = thresholdsTrigger[channelNo][step];
+                myTlu.SetPMTVoltage(optimalVoltages);
+                myTlu.SetTLUThreshold(varThresholds, connectionBool, "normal");
+                ratesTrigger[channelNo][step] = myTlu.MeasureRate(connectionBool);
+            }
+        }
+
+        for (int channel = 0; channel < numTriggerInputs; channel++){
+            myTlu.WriteOutputFileTrigger(channel, filename, optimalVoltages, thresholdsTrigger, ratesTrigger, optimalThresholds);
+        }
+
+
+
+        myTlu.PlotTrigger(filename);
+    }
+
+    if (optimizationPlot){
+        optimalVoltages = {0.9, 0.95, 0.9, 0.85};
+        optimalThresholds = {-0.064, -0.078, -0.078, -0.068};
+        thresholdMinOpt = {-0.078, -0.107, -0.103, -0.098};
+        thresholdMaxOpt = {-0.049, -0.053, -0.054, -0.039};
+
+        myTlu.PlotTrigger(filename);
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// ////////////////////////////////////////////////////////////////////////////////////
+
 
 
 

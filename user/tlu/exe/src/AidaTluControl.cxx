@@ -404,10 +404,10 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
     // Calculate linearized derivative of rate
     Double_t derivative[numTriggerInputs][numThresholdValues];
     for (int i = 0; i < numTriggerInputs; i++){
-        for (int j = 0; j < numThresholdValues - 1; j++){
-            derivative[i][j] =  rate[i][j+1] - rate[i][j];
+        for (int j = 1; j < numThresholdValues; j++){
+            derivative[i][j] =  rate[i][j] - rate[i][j-1];
         }
-        derivative[i][numThresholdValues-1] = derivative[i][numThresholdValues-2]; //extrapolate last point
+        derivative[i][0] = derivative[i][1]; //extrapolate last point
     }
 
 
@@ -447,12 +447,14 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
     TGraph *gr2[numTriggerInputs];
     TGraph *grPlateau[numTriggerInputs];
     TGraph *grMidpoint[numTriggerInputs];
+    TGraph *grPlateauDeriv[numTriggerInputs];
 
 
 
 
 
-    for (int i = 0; i < numTriggerInputs; i++){
+    for (int i = 0; i < numTriggerInputs; i++){\
+
         c1->cd(i+1);
 
         gr[i] = new TGraph (numThresholdValues,threshold,rate[i]);
@@ -469,12 +471,8 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
 
         // Fit Gaussian to first derivative
         TF1 *f;
-        if((i==0) || (i==1)){
-            f = new TF1("f", "gaus", -0.2, -0.02);
-        }
-        else{
-            f = new TF1("f", "gaus", -0.2, -0.05);
-        }
+        f = new TF1("f", "gaus", -0.2, -0.05);
+
         gr2[i]->Fit(f, "RQ"); //R: fit only in predefined range Q:Quiet
         double meanGaus = f->GetParameter(1);
         double constGaus = f->GetParameter(0);
@@ -487,6 +485,7 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
 
         // Find Plateau
         grPlateau[i] = new TGraph();
+        grPlateauDeriv[i] = new TGraph();
         double coefficient = 0.5;
 
         //Make sure at least one Plateau point is found, otherwise: lower condition
@@ -495,6 +494,13 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
             for (int j = 0; j < numThresholdValues; j++){
                 if ((threshold[j] > meanGaus) & (derivative[i][j] <= coefficient * constGaus)){
                     grPlateau[i]->SetPoint(k, threshold[j], rate[i][j]);
+                    grPlateauDeriv[i]->SetPoint(k, threshold[j], derivative[i][j]);
+                    k++;
+                }
+                // also add point if both next neighbours fulfill plateau conditions
+                else if ((j > 0) & (j < numThresholdValues-1) & (threshold[j-1] > meanGaus) & (derivative[i][j-1] <= coefficient * constGaus) & (threshold[j+1] > meanGaus) & (derivative[i][j+1] <= coefficient * constGaus)){
+                    grPlateau[i]->SetPoint(k, threshold[j], rate[i][j]);
+                    grPlateauDeriv[i]->SetPoint(k, threshold[j], derivative[i][j]);
                     k++;
                 }
 
@@ -506,12 +512,18 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
             std::cout << "No Plateau could be found for PMT " << i+1 << std::endl;
             flagPlateauError = true;
         }
+        else if(grPlateau[i]->GetN() == numThresholdValues){
+            std::cout << "No Plateau could be found for PMT " << i+1 << std::endl;
+            grPlateau[i] = new TGraph();
+            flagPlateauError = true;
+        }
 
         else{
             // Find Midpoint of Plateau
             grMidpoint[i] = new TGraph();
             int lenPlateau = grPlateau[i]->GetN();
-            int indexMidpoint = (lenPlateau + 1*lenPlateau%2)/2 - 1;
+
+            int indexMidpoint = (lenPlateau + (lenPlateau % 2))/2 - (lenPlateau % 2);
             std::cout << "index mid   " << indexMidpoint << std::endl;
             std::cout << "len plateau   " << lenPlateau << std::endl;
             grMidpoint[i]->SetPoint(0, grPlateau[i]->GetX()[indexMidpoint], grPlateau[i]->GetY()[indexMidpoint]);
@@ -546,6 +558,17 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
             grMidpoint[i]->SetMarkerSize(1);
             grMidpoint[i]->SetMarkerColor(kGreen + 1);
             grMidpoint[i]->SetTitle("Optimal Threshold");
+
+
+            // Plot Plateau and Midpoint
+            c2->cd(i+1);
+            grPlateauDeriv[i]->Draw("*");
+            grPlateauDeriv[i]->SetMarkerStyle(20);
+            grPlateauDeriv[i]->SetMarkerSize(1);
+            grPlateauDeriv[i]->SetMarkerColor(kRed + 1);
+
+
+
 
 
             //Plot legend

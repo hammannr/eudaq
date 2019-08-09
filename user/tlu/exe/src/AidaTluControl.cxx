@@ -292,8 +292,8 @@ std::vector<double> AidaTluControl::MeasureRate(std::vector<bool> connectionBool
     output[numTriggerInputs + 1] = m_tlu->GetPostVetoTriggers() / double(time);
 
 
-    std::cout << std::dec << sl[0] << "  " << sl[1]<< "  " << sl[2]<< "  " << sl[3]<< "  " << sl[4]<< "  " << sl[5] << std::endl;
-    std::cout << "Trigger Feq: " <<  m_tlu->GetPreVetoTriggers() <<std::endl;
+    std::cout << "Scalers:  "<<std::dec << sl[0] << "  " << sl[1]<< "  " << sl[2]<< "  " << sl[3]<< "  " << sl[4]<< "  " << sl[5] << std::endl;
+    std::cout << "Triggers:  " <<  m_tlu->GetPreVetoTriggers() <<std::endl;
     m_tlu->ResetCounters();
     m_tlu->ResetSerdes();
 
@@ -342,7 +342,6 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
                 for (int i = 0; i < numTriggerInputs + 1; i++){
                     std::string val;
                     lineS >> val;
-                    //std::cout << i <<"\t" <<val<< std::endl;
                     if(val=="") continue;
                     if (i == 0){
                         threshold[lineCounter - skiplines] = std::stod(val);
@@ -374,7 +373,6 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
                 for (int i = 0; i < numTriggerInputs + 1; i++){
                     std::string val;
                     lineS >> val;
-                    //std::cout << i <<"\t" <<val<< std::endl;
                     if(val=="") continue;
                     if (i > 0){
                         rateSecond[i-1][lineCounter - skiplines] = std::stod(val);
@@ -515,11 +513,11 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
         }
 
         if(grPlateau[i]->GetN() == 0){
-            std::cout << "No Plateau could be found for PMT " << i+1 << std::endl;
+            std::cout << "No Plateau could be found for PMT (no points found)" << i+1 << std::endl;
             flagPlateauError = true;
         }
         else if(grPlateau[i]->GetN() == numThresholdValues){
-            std::cout << "No Plateau could be found for PMT " << i+1 << std::endl;
+            std::cout << "No Plateau could be found for PMT (all points identified as plateau)" << i+1 << std::endl;
             grPlateau[i] = new TGraph();
             flagPlateauError = true;
         }
@@ -530,16 +528,7 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
             int lenPlateau = grPlateau[i]->GetN();
 
             int indexMidpoint = (lenPlateau + (lenPlateau % 2))/2 - (lenPlateau % 2);
-            std::cout << "index mid   " << indexMidpoint << std::endl;
-            std::cout << "len plateau   " << lenPlateau << std::endl;
             grMidpoint[i]->SetPoint(0, grPlateau[i]->GetX()[indexMidpoint], grPlateau[i]->GetY()[indexMidpoint]);
-
-            std::cout << ":::::::::::::::::::::::::::::::::::::" << std::endl;
-            for (int j = 0; j < lenPlateau; j++){
-                std::cout << grPlateau[i]->GetX()[j] << std::endl;
-            }
-            std::cout << ":::::::::::::::::::::::::::::::::::::" << std::endl;
-
 
             if (lenPlateau < 3){
                 double diff = gr[i]->GetX()[1] - gr[i]->GetX()[0];
@@ -623,8 +612,6 @@ void AidaTluControl::PlotTrigger(std::string filename){
 
     // Open File with data and write them into arrays
     std::ifstream infile;
-
-    std::cout << "Numer of threshold steps:  " << numStepsTrigger << std::endl;
     Double_t threshold[numTriggerInputs][numStepsTrigger];
     Double_t rate[numTriggerInputs][numStepsTrigger];
     Double_t correctionFactor;
@@ -646,22 +633,29 @@ void AidaTluControl::PlotTrigger(std::string filename){
                     std::istringstream lineS;
                     lineS.str(line);
 
-                    for (int i = 0; i < numTriggerInputs + 3; i++){
+                    for (int i = 0; i < numTriggerInputs + 2; i++){
                         std::string val;
                         lineS >> val;
-                        if(val=="") continue;
+                        //if(val=="") continue;
+                        // get rate of first channel as normalization for each point (except for first channel where you get 2nd channel as reference)
+                        if (channel == 0){
+                            if (i == 2){
+                                correctionFactor = std::stod(val);
+                            }
+                        }
+                        else{
+                            if (i == 1){
+                                correctionFactor = std::stod(val);
+                            }
+                        }
+
                         if (i == 0){
                             threshold[channel][lineCounter - skiplines] = std::stod(val);
-                            //std::cout<< "Thr  "<<std::stod(val) << std::endl;
                         }
-                        // get rate of first channel as normalization for each point
-                        if (i == 1){
-                            correctionFactor = std::stod(val);
-                        }
+
                         // Take PostVetoTrigger:
                         else if (i == numTriggerInputs + 1){
                             rate[channel][lineCounter - skiplines] = std::stod(val) / correctionFactor;
-                            //std::cout<< "Trig  "<<std::stod(val) << std::endl;
                         }
                     }
                 }
@@ -694,13 +688,13 @@ void AidaTluControl::PlotTrigger(std::string filename){
     for (int i = 0; i < numTriggerInputs; i++){
         c1->cd(i+1);
 
-        gr[i] = new TGraph (numThresholdValues,threshold[i],rate[i]);
+        gr[i] = new TGraph (numStepsTrigger,threshold[i],rate[i]);
         gr[i]->Draw("AL*");
 
         gr[i]->SetMarkerStyle(20);
         gr[i]->SetMarkerSize(0.5);
         gr[i]->SetMarkerColor(kBlue + 1);
-        std::string title = std::string("Vary PMT ") + std::to_string(i+1) + std::string("; Threshold ") + std::to_string(i+1) + std::string("/ V; Rate / Hz");
+        std::string title = std::string("Vary PMT ") + std::to_string(i+1) + std::string("; Threshold ") + std::to_string(i+1) + std::string("/ V; Trigger Rate / a.U.");
         gr[i]->SetTitle(title.c_str());
     }
 
@@ -808,6 +802,7 @@ int main(int /*argc*/, char **argv) {
     eudaq::Option<bool> optTrig(op, "opt", "optimizetrig", false, "bool", "optimize for trigger rates");
     eudaq::Option<bool> optPlot(op, "optplot", "optplot", false, "bool", "only plot optimization stuff");
     eudaq::Option<int> trigNum(op, "otn", "optimizetrignum", 11, "int", "number of steps for trigger optimization");
+    eudaq::Option<int> deb(op, "deb", "debug", 0, "int", "debug number");
     //eudaq::Option<bool> setOpt(op, "setopt", "setoptparams", false, "bool", "set optimal parameters");
     //eudaq::Option<std::vector<double>> voltOpt(op, "ov", "optpmtvoltages", (0.8,0.8,0.8,0.8), "vector double", "optimal PMT voltages [V]");
     //eudaq::Option<std::vector<double>> thrOpt(op, "ot", "optthresholds", (-0.08,-0.08,-0.08,-0.08), "vector double", "optimal threshold values [V]");
@@ -827,6 +822,7 @@ int main(int /*argc*/, char **argv) {
 
     bool optimizationPlot = optPlot.Value();
 
+    int debugNumber = deb.Value();
     double thresholdMin = thrMin.Value();
     double thresholdMax = thrMax.Value();
     double thresholdDifference = thresholdMax - thresholdMin;
@@ -851,8 +847,12 @@ int main(int /*argc*/, char **argv) {
         }
     }
 
-    if(numTriggerInputs < 2) std::cout << "CAUTION: number of TLU inputs is smaller than 2! Correction for beam fluctuation is not possible."<< std::endl;
-
+    if(numTriggerInputs < 2){
+        std::cout << "CAUTION: number of TLU inputs is smaller than 2! Correction for beam fluctuation is not possible."<< std::endl;
+        std::cout << "Enter 'q' to continue" << std::endl;
+        int k;
+        std::cin >> k;
+    }
 
     for (int i = 0; i < 6; i++){
         std::cout << connectionBool[i]<< std::endl;
@@ -917,7 +917,7 @@ int main(int /*argc*/, char **argv) {
     std::vector<double> thresholdMinOpt;
     std::vector<double> thresholdMaxOpt;
 
-    if((! tluConnected) && (!optimizeTriggerRates)){
+    if((! tluConnected) && (!optimizeTriggerRates) && (!optimizationPlot)){
         std::vector<std::vector<double>> optimalReturn = myTlu.GetOptimalThreshold(filename);
 
         optimalThresholds = optimalReturn[0];
@@ -947,8 +947,10 @@ int main(int /*argc*/, char **argv) {
         myTlu.DoStartUp();
         optimalVoltages = {0.9, 0.95, 0.9, 0.85};
         optimalThresholds = {-0.064, -0.078, -0.078, -0.068};
-        thresholdMinOpt = {-0.078, -0.107, -0.103, -0.098};
-        thresholdMaxOpt = {-0.049, -0.053, -0.054, -0.039};
+        //thresholdMinOpt = {-0.078, -0.107, -0.103, -0.098};
+        //thresholdMaxOpt = {-0.049, -0.053, -0.054, -0.039};
+        thresholdMinOpt = {-0.2, -0.2, -0.2, -0.2};
+        thresholdMaxOpt = {-0.01, -0.01, -0.01, -0.01};
 
         //three dimensional vector [numTriggerInputs] [numStepsTrigger] [numTriggerInputs+2]
         std::vector<std::vector<std::vector<double>>> ratesTrigger(numTriggerInputs, std::vector<std::vector<double>>(numStepsTrigger, std::vector<double>(numTriggerInputs + 2)));
@@ -987,6 +989,18 @@ int main(int /*argc*/, char **argv) {
         thresholdMaxOpt = {-0.049, -0.053, -0.054, -0.039};
 
         myTlu.PlotTrigger(filename);
+    }
+
+    if (debugNumber == 1){
+        double_t voltages = {0.85, 0.9, 0.95};
+        TFile *f;
+        TCanvas *c;
+
+        f = new TFile("060819_7_rates.root");
+        c = (TCanvas *)f ->Get("c1");
+        c->cd(0);
+        c->GetListOfPrimitives()->Print();
+        //TGraph *g = (TGraph *) c->Get("Graph");
     }
 
 

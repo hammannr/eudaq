@@ -854,9 +854,6 @@ int main(int /*argc*/, char **argv) {
         std::cin >> k;
     }
 
-    for (int i = 0; i < 6; i++){
-        std::cout << connectionBool[i]<< std::endl;
-    }
 
     // create array of thresholds
     std::vector<double> thresholds(numThresholdValues);
@@ -887,28 +884,42 @@ int main(int /*argc*/, char **argv) {
 
 
     if(tluConnected){
-        myTlu.DoStartUp();
-        for (int i = 0; i < numThresholdValues; i++){
-            myTlu.SetPMTVoltage(voltage);
-
-            myTlu.SetTLUThreshold(thresholds[i]);
-            myTlu.SetTLUThreshold(standardThreshold, connectionBool, "first");
-
-            rates[i] = myTlu.MeasureRate(connectionBool);
+        if (debugNumber == 2){
+            std::cout << "Measuring Background"<< std::endl;
+            myTlu.DoStartUp();
+            for (int i = 0; i < numThresholdValues; i++){
+                myTlu.SetPMTVoltage(voltage);
+                myTlu.SetTLUThreshold(thresholds[i]);
+                rates[i] = myTlu.MeasureRate(connectionBool);
+            }
+            std::string filenameFirst = filename + std::string("_background");
+            myTlu.WriteOutputFile(filenameFirst, voltage, rates, thresholds);
         }
-        std::string filenameFirst = filename + std::string("_first");
-        myTlu.WriteOutputFile(filenameFirst, voltage, rates, thresholds);
+        else{
+            myTlu.DoStartUp();
+            for (int i = 0; i < numThresholdValues; i++){
+                myTlu.SetPMTVoltage(voltage);
 
-        // Repeat Measurement for first input, now the second input is constant
-        for (int i = 0; i < numThresholdValues; i++){
-            myTlu.SetPMTVoltage(voltage);
-            myTlu.SetTLUThreshold(thresholds[i]);
-            myTlu.SetTLUThreshold(standardThreshold, connectionBool, "second");
+                myTlu.SetTLUThreshold(thresholds[i]);
+                myTlu.SetTLUThreshold(standardThreshold, connectionBool, "first");
 
-            rates[i] = myTlu.MeasureRate(connectionBool);
+                rates[i] = myTlu.MeasureRate(connectionBool);
+            }
+            std::string filenameFirst = filename + std::string("_first");
+            myTlu.WriteOutputFile(filenameFirst, voltage, rates, thresholds);
+
+            // Repeat Measurement for first input, now the second input is constant
+            for (int i = 0; i < numThresholdValues; i++){
+                myTlu.SetPMTVoltage(voltage);
+                myTlu.SetTLUThreshold(thresholds[i]);
+                myTlu.SetTLUThreshold(standardThreshold, connectionBool, "second");
+
+                rates[i] = myTlu.MeasureRate(connectionBool);
+            }
+            std::string filenameSecond = filename + std::string("_second");
+            myTlu.WriteOutputFile(filenameSecond, voltage, rates, thresholds);
         }
-        std::string filenameSecond = filename + std::string("_second");
-        myTlu.WriteOutputFile(filenameSecond, voltage, rates, thresholds);
+
     }
 
 
@@ -924,15 +935,10 @@ int main(int /*argc*/, char **argv) {
         thresholdMinOpt = optimalReturn[1];
         thresholdMaxOpt = optimalReturn[2];
 
-        for (int i = 0; i < thresholdMinOpt.size(); i++){
-            std::cout << "Plateau:  "<< thresholdMinOpt[i] << " -- " << optimalThresholds[i] << " -- " << thresholdMaxOpt[i] <<std::endl;
-        }
-
-
         std::cout << "__________________________" << std::endl;
         std::cout << "Optimal Threshold Values:" << std::endl;
         for (int i = 0; i < numTriggerInputs; i++){
-            std::cout << "TLU " << i+1 << ":   " << optimalThresholds[i]<< " V" << std::endl;
+            std::cout << "TLU " << i+1 << ":   " << optimalThresholds[i]<< " V" << "   (" << "Plateau:  "<< thresholdMinOpt[i] << " - " << thresholdMaxOpt[i] << ")"<< std::endl;
         }
         std::cout << "__________________________" << std::endl;
 
@@ -990,7 +996,7 @@ int main(int /*argc*/, char **argv) {
 
         myTlu.PlotTrigger(filename);
     }
-
+/*
     if (debugNumber == 1){
         double_t voltages = {0.85, 0.9, 0.95};
         TFile *f;
@@ -1001,8 +1007,8 @@ int main(int /*argc*/, char **argv) {
         c->cd(0);
         c->GetListOfPrimitives()->Print();
         //TGraph *g = (TGraph *) c->Get("Graph");
-    }
 
+    }*/
 
     ////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////

@@ -865,13 +865,6 @@ int main(int /*argc*/, char **argv) {
             thresholds[i] = thresholdMin + i * thresholdDifference / (numThresholdValues-1);
         }
     }
-    ////////////////////////////////////////////////////////
-    // HARDCODE:::
-    numTriggerInputs = 2;
-    std::cout << "---------------CAUTION: Hardcode in code (numTriggerInputs)!---------------" <<std::endl;
-    std::cout << "Enter 'q' to continue" << std::endl;
-    ////////////////////////////////////////
-    ////////////////////////////////////////////////
 
     AidaTluControl myTlu;
     myTlu.WriteParameters(numThresholdValues, numTriggerInputs, time, numStepsTrigger);
@@ -976,7 +969,7 @@ int main(int /*argc*/, char **argv) {
 
 
         std::vector<double> voltages = {0.8, 0.85, 0.9, 0.95};
-        std::vector<std::string> filenames = {"160819_6", "160819_7", "160819_8", "160819_9"};
+        std::vector<std::string> filenames = {"200819_1", "200819_2", "200819_3", "200819_4"};
         std::cout << "CAUTION!! CHANGE FILENAMES!!"<< std::endl;
 
 
@@ -990,8 +983,8 @@ int main(int /*argc*/, char **argv) {
             //optimalThresholds = {-0.064, -0.078, -0.078, -0.068};
             //thresholdMinOpt = {-0.078, -0.107, -0.103, -0.098};
             //thresholdMaxOpt = {-0.049, -0.053, -0.054, -0.039};
-            thresholdMinOpt = {-0.2, -0.2};
-            thresholdMaxOpt = {-0.0001, -0.0001};
+            thresholdMinOpt = {-0.2, -0.2, -0.2, -0.2};
+            thresholdMaxOpt = {-0.0001, -0.0001, -0.0001, -0.0001};
 
 
 

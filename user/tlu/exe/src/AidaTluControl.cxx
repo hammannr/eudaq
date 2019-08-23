@@ -18,6 +18,7 @@
 #include <thread>
 #include <map>
 #include <math.h>
+#include <numeric>
 
 // ROOT includes
 #include <TROOT.h>
@@ -33,9 +34,6 @@
 #include <TLegend.h>
 #include <TGraph2D.h>
 #include <TMath.h>
-
-
-//#include "gnuplot-iostream.h"
 
 class AidaTluControl {
 public:
@@ -316,10 +314,6 @@ std::vector<double> AidaTluControl::MeasureRate(std::vector<bool> connectionBool
 }
 
 std::vector<std::vector<std::vector<double>>> AidaTluControl::readFiles(std::string filename){
-//    Double_t threshold[numThresholdValues];
-//    Double_t rateFirst[numTriggerInputs][numThresholdValues];
-//    Double_t rateSecond[numTriggerInputs][numThresholdValues];
-
 
     std::vector<std::vector<std::vector<double>>> returnValue (3,std::vector<std::vector<double>>(numTriggerInputs,std::vector<double>(numThresholdValues))) ;//[3][numTriggerInputs][numThresholdValues];
     std::string line;
@@ -386,12 +380,6 @@ std::vector<std::vector<std::vector<double>>> AidaTluControl::readFiles(std::str
     return returnValue;
 }
 
-/*
-// Sum of background and peak function
-Double_t fitFunction(Double_t *x, Double_t *par) {
-   return par[3] + par[0]/sqrt(2*TMath::Pi()*pow(par[2],2)) * exp(-pow((x - par[1]),2) / (2*pow(par[2],2)));
-}
-*/
 std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string filename){
     //std::vector<std::string> appendices = {"_first", "_second"};
     // Open File with data and write them into arrays
@@ -495,8 +483,10 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
         gr[i]->SetMarkerSize(0.5);
         gr[i]->SetMarkerColor(kBlue - 2);
         gr[i]->SetLineColor(kBlue - 2);
-        std::string title = std::string("PMT ") + std::to_string(i+1) + std::string("; Threshold / V; Rate / Hz");
+        std::string title = std::string("PMT ") + std::to_string(i+1) + std::string("; Threshold  [V]; Relative Rate [a.U.]");
         gr[i]->SetTitle(title.c_str());
+        gr[i]->SetMinimum(0);
+
 
         c2->cd(i+1);
         gr2[i] = new TGraph (numThresholdValues,threshold,derivative[i]);
@@ -504,28 +494,32 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
         // Fit Gaussian to first derivative
         TF1 *f;        
 
-        //f = new TF1("f",  "[3]+[0]/sqrt(2*pi*[2]^2)*exp(-1*(x-[1])^2/(2*[2]^2))", -0.2, -0.05);
-        f = new TF1("f",  "gaus", -0.2, -0.05);
-        //f = new TF1("f",  "[0] * exp(-1*(x - [1])^2)", -0.2, -0.05);
-        f->SetParNames("Constant","Mean","Sigma","Offset");
-        //f = new TF1("f",  "[0]*x^2*sqrt([1])*pi+exp(-x)", -0.2, -0.05);
+        f = new TF1("f",  "[3]+[0]*exp(-1*(x-[1])**2/(2*[2]**2))", -0.2, -0.05);
+        f->SetParNames("Constant","Mean","Sigma", "Offset");
 
-        gr2[i]->Fit(f, "R"); //R: fit only in predefined range Q:Quiet
+        // Set initial values and limits
+        f->SetParameters(10, -0.15, 0.05);
+        f->SetParLimits(2,0,0.1);
+        f->SetParLimits(1,-0.8,-0.05);
+
+        gr2[i]->Fit(f, "RQ"); //R: fit only in predefined range Q:Quiet
         double meanGaus = f->GetParameter(1);
-        double constGaus = f->GetParameter(0);
+        double constGaus = f->GetParameter(0) + f->GetParameter(3);
         gr2[i]->Draw("AL*");
         gr2[i]->SetMarkerStyle(20);
         gr2[i]->SetMarkerSize(0.5);
         gr2[i]->SetMarkerColor(kBlue - 2);
         gr2[i]->SetLineColor(kBlue - 2);
-        std::string titleDerivative = std::string("PMT ") + std::to_string(i+1) + std::string("; Threshold / V; a.U.");
+        std::string titleDerivative = std::string("PMT ") + std::to_string(i+1) + std::string("; Threshold [V]; Derivative [a.U.]");
         gr2[i]->SetTitle(titleDerivative.c_str());
+        gr2[i]->SetMaximum(constGaus*1.5);
+        gr2[i]->SetMinimum(0);
 
         // Find Plateau
         grPlateau[i] = new TGraph();
         grPlateauDeriv[i] = new TGraph();
-        double coefficient = 0.5;
-        //constGaus = 10;
+        double coefficient = 0.55;
+        std::vector<double> additionalPoints;
 
         //Make sure at least one Plateau point is found, otherwise: lower condition
         while ((grPlateau[i]->GetN() == 0) & (coefficient <= 1)){
@@ -541,12 +535,30 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
                 else if ((j > 0) & (j < numThresholdValues-2) & (threshold[j-2] > meanGaus) & (derivative[i][j-2] <= coefficient * constGaus) & (threshold[j] > meanGaus) & (derivative[i][j] <= coefficient * constGaus)){
                     grPlateau[i]->SetPoint(k, threshold[j], rate[i][j]);
                     grPlateauDeriv[i]->SetPoint(k, threshold[j - 1], derivative[i][j - 1]);
+                    additionalPoints.push_back(derivative[i][j - 1]);
                     k++;
                 }
+            }
 
+            // also add points that are below additionally added points
+            double averageAdditionalPoints;
+            if(additionalPoints.size() > 0){
+                averageAdditionalPoints = std::accumulate(additionalPoints.begin(), additionalPoints.end(), 0.0)/additionalPoints.size();
+            }
+            else{
+                averageAdditionalPoints = 0;
+            }
+
+            for (int j = 1; j < numThresholdValues; j++){
+                if ((threshold[j] > meanGaus) & !(derivative[i][j - 1] <= coefficient * constGaus) & (derivative[i][j - 1] < averageAdditionalPoints)){
+                    grPlateau[i]->SetPoint(k, threshold[j], rate[i][j]);
+                    grPlateauDeriv[i]->SetPoint(k, threshold[j - 1], derivative[i][j - 1]);
+                    k++;
+                }
             }
             coefficient +=0.05;
         }
+        grPlateau[i]->Sort();
 
         if(grPlateau[i]->GetN() == 0){
             std::cout << "No Plateau could be found for PMT " << i+1 << " (no points found)"<< std::endl;
@@ -563,8 +575,10 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
             grMidpoint[i] = new TGraph();
             int lenPlateau = grPlateau[i]->GetN();
 
-            int indexMidpoint = (lenPlateau + (lenPlateau % 2))/2 - (lenPlateau % 2);
+            int indexMidpoint = (lenPlateau + (lenPlateau % 2))/2 - (lenPlateau % 2);            
             grMidpoint[i]->SetPoint(0, grPlateau[i]->GetX()[indexMidpoint], grPlateau[i]->GetY()[indexMidpoint]);
+
+            gr[i]->SetMaximum(2.5 * grPlateau[i]->GetY()[indexMidpoint]);
 
             if (lenPlateau < 3){
                 double diff = gr[i]->GetX()[1] - gr[i]->GetX()[0];
@@ -591,10 +605,11 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
             grMidpoint[i]->SetMarkerColor(kGreen + 1);
 
             //Plot legend
-            auto legend = new TLegend(0.1,0.8,0.58,0.9);
-            std::string midPointString = std::to_string(grMidpoint[i]->GetX()[0]);
-            midPointString.erase(midPointString.begin()+6, midPointString.end()); //limit number of values after comma
-            std::string labelMidpoint = std::string("Optimal Threshold:  ") + midPointString + std::string(" V");
+            auto legend = new TLegend(0.1,0.75,0.6,0.9);
+            std::string midPointString = std::to_string(std::round((grMidpoint[i]->GetX()[0])*1000));
+            midPointString.erase(midPointString.begin()+4, midPointString.end()); //limit number of values after comma
+            std::string labelMidpoint = std::string("Optimal Threshold:  ") + midPointString + std::string(" mV");
+            legend->AddEntry(grPlateau[i],"Identified Plateau","p");
             legend->AddEntry(grMidpoint[i],labelMidpoint.c_str(),"p");
             legend->Draw();
 
@@ -628,13 +643,9 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
     c2->SaveAs(exportFile2.c_str());
     exportFile2 = filename + (std::string)"_derivative.root";
     c2->SaveAs(exportFile2.c_str());
-    std::cout << "Enter 'q' to continue" << std::endl;
+    std::cout << "Enter 'c' to continue" << std::endl;
     int k;
     std::cin >> k;
-
-    //myApp->Run();
-    //myApp->Terminate();
-
 
     return {optimalThreshold, thresholdMinOpt, thresholdMaxOpt};
 }
@@ -743,7 +754,7 @@ void AidaTluControl::PlotTrigger(std::string filename){
     exportFile = filename + (std::string)"_OptimizeTrigger.root";
     c1->SaveAs(exportFile.c_str());
 
-    std::cout << "Enter 'q' to continue" << std::endl;
+    std::cout << "Enter 'c' to continue" << std::endl;
     int k;
     std::cin >> k;
 
@@ -837,11 +848,6 @@ int main(int /*argc*/, char **argv) {
     eudaq::Option<bool> optPlot(op, "optplot", "optplot", false, "bool", "only plot optimization stuff");
     eudaq::Option<int> trigNum(op, "otn", "optimizetrignum", 11, "int", "number of steps for trigger optimization");
     eudaq::Option<int> deb(op, "deb", "debug", 0, "int", "debug number");
-    //eudaq::Option<bool> setOpt(op, "setopt", "setoptparams", false, "bool", "set optimal parameters");
-    //eudaq::Option<std::vector<double>> voltOpt(op, "ov", "optpmtvoltages", (0.8,0.8,0.8,0.8), "vector double", "optimal PMT voltages [V]");
-    //eudaq::Option<std::vector<double>> thrOpt(op, "ot", "optthresholds", (-0.08,-0.08,-0.08,-0.08), "vector double", "optimal threshold values [V]");
-    //eudaq::Option<std::vector<double>> thrMinOpt(op, "otl", "optthresholdslow", (-0.1,-0.1,-0.1,-0.1), "vector double", "optimal threshold values low [V]");
-    //eudaq::Option<std::vector<double>> thrMaxOpt(op, "oth", "optthresholdshigh", (-0.06,-0.06,-0.06,-0.06), "vector double", "optimal threshold values high [V]");
 
 
     try{
@@ -866,7 +872,7 @@ int main(int /*argc*/, char **argv) {
     std::string filename = name.Value();
     if (filename == "output") {
         std::cout << "---------------CAUTION: FILENAME IS SET TO DEFAULT. DANGER OF DATA LOSS!---------------" <<std::endl;
-        std::cout << "Enter 'q' to continue" << std::endl;
+        std::cout << "Enter 'c' to continue" << std::endl;
         int k;
         std::cin >> k;
     }
@@ -883,7 +889,7 @@ int main(int /*argc*/, char **argv) {
 
     if(numTriggerInputs < 2){
         std::cout << "CAUTION: number of TLU inputs is smaller than 2! Correction for beam fluctuation is not possible."<< std::endl;
-        std::cout << "Enter 'q' to continue" << std::endl;
+        std::cout << "Enter 'c' to continue" << std::endl;
         int k;
         std::cin >> k;
     }
@@ -920,7 +926,7 @@ int main(int /*argc*/, char **argv) {
 //    optimalVoltages = {0.9, 0.95, 0.9, 0.85};
 //    optimalThresholds = {-0.064, -0.078, -0.078, -0.068};
     double standardThreshold = -0.07;
-    double standardVoltage = 0.9;
+    double standardVoltage = 0.85;
 
     if(tluConnected){
         //std::vector<double> voltages = {0.8, 0.85, 0.9, 0.95};
@@ -986,7 +992,7 @@ int main(int /*argc*/, char **argv) {
         std::cout << "__________________________" << std::endl;
         std::cout << "Optimal Threshold Values:" << std::endl;
         for (int i = 0; i < numTriggerInputs; i++){
-            std::cout << "TLU " << i+1 << ":   " << optimalThresholds[i]<< " V" << "   (" << "Plateau:  "<< thresholdMinOpt[i] << " - " << thresholdMaxOpt[i] << ")"<< std::endl;
+            std::cout << "PMT " << i+1 << ":   " << optimalThresholds[i]<< " V" << "   (" << "Plateau:  "<< thresholdMinOpt[i] << " - " << thresholdMaxOpt[i] << ")"<< std::endl;
         }
         std::cout << "__________________________" << std::endl;
 

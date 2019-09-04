@@ -19,7 +19,8 @@ if(USER_TLU_BUILD_AIDA)
     src/AidaTluHardware.cc
     src/AidaTluPowerModule.cc
     src/AidaTluI2c.cc
-    src/AidaTluDisplay.cc)
+    src/AidaTluDisplay.cc
+    src/AidaTluControl.cc)
   list(APPEND USER_HARDWARE_DEP_LIB ${CACTUS_LIBRARIES})
 endif()
 

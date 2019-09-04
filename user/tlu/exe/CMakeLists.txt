@@ -49,6 +49,13 @@ if(USER_TLU_BUILD_AIDA)
   list(APPEND INSTALL_TARGETS ${EXE_AIDA_TLU_CONTROL})
 
   # adding command line interface to AidaTLU
+  set(EXE_AIDA_PMTOPTI AidaOptimizeTrigger)
+  add_executable(${EXE_AIDA_PMTOPTI} src/AidaOptimizeTrigger.cxx)
+  target_link_libraries(${EXE_AIDA_PMTOPTI} ${EUDAQ_CORE_LIBRARY} ${USER_HARDWARE_LIBRARY})
+  list(APPEND INSTALL_TARGETS ${EXE_AIDA_PMTOPTI})
+
+
+  # adding command line interface to AidaTLU
   set(EXE_AIDA_CLI AidaClInterface)
   add_executable(${EXE_AIDA_CLI} src/AidaClInterface.cxx)
   target_link_libraries(${EXE_AIDA_CLI} ${EUDAQ_CORE_LIBRARY} ${USER_HARDWARE_LIBRARY})

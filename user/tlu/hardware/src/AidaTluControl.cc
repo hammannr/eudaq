@@ -21,20 +21,7 @@
 #include <math.h>
 #include <numeric>
 
-// ROOT includes
-#include <TROOT.h>
-#include <TGraph.h>
-#include <TCanvas.h>
-#include <TBrowser.h>
-#include <TFrame.h>
-#include <TFile.h>
-#include <TApplication.h>
-#include <TGaxis.h>
-#include <TF1.h>
-#include <TLatex.h>
-#include <TLegend.h>
-#include <TGraph2D.h>
-#include <TMath.h>
+
 
 AidaTluControl::AidaTluControl(){
     m_verbose = 0x0;

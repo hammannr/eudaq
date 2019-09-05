@@ -19,6 +19,21 @@
 #include "AidaTluPowerModule.hh"
 #include "eudaq/OptionParser.hh"
 
+
+#include <TROOT.h>
+#include <TGraph.h>
+#include <TCanvas.h>
+#include <TBrowser.h>
+#include <TFrame.h>
+#include <TFile.h>
+#include <TApplication.h>
+#include <TGaxis.h>
+#include <TF1.h>
+#include <TLatex.h>
+#include <TLegend.h>
+#include <TGraph2D.h>
+#include <TMath.h>
+
 class AidaTluControl {
 public:
     AidaTluControl();

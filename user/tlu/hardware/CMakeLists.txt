@@ -1,4 +1,5 @@
 include_directories(include)
+include_directories(${ROOT_INCLUDE_DIRS})
 
 # library
 if(USER_TLU_BUILD_EUDET)
@@ -13,8 +14,9 @@ if(USER_TLU_BUILD_EUDET)
 endif()
 
 if(USER_TLU_BUILD_AIDA)
-  include_directories(${CACTUS_INCLUDE_DIR})
-  list(APPEND USER_HARDWARE_SRC 
+    include_directories(${CACTUS_INCLUDE_DIR})
+
+  list(APPEND USER_HARDWARE_SRC
     src/AidaTluController.cc
     src/AidaTluHardware.cc
     src/AidaTluPowerModule.cc

@@ -1,7 +1,4 @@
 #include "AidaTluControl.hh"
-#include "AidaTluController.hh"
-#include "AidaTluHardware.hh"
-#include "AidaTluPowerModule.hh"
 #include "eudaq/OptionParser.hh"
 
 #include <string>

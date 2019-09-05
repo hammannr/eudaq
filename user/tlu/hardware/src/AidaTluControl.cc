@@ -620,6 +620,8 @@ std::vector<std::vector<double>> AidaTluControl::GetOptimalThreshold(std::string
     std::cout << "Enter 'c' to continue" << std::endl;
     int k;
     std::cin >> k;
+    std::cin.clear();
+    std::cin.ignore(512, '\n');
 
     return {optimalThreshold, thresholdMinOpt, thresholdMaxOpt};
 }
@@ -730,6 +732,8 @@ void AidaTluControl::PlotTrigger(std::string filename){
     std::cout << "Enter 'c' to continue" << std::endl;
     int k;
     std::cin >> k;
+    std::cin.clear();
+    std::cin.ignore(512, '\n');
 
 }
 

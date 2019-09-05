@@ -574,10 +574,10 @@ namespace tlu {
   void AidaTluController::pwrled_setVoltages(float v1, float v2, float v3, float v4, uint8_t verbose) {
     // Note that ordering is not 1:1. Mapping is done in here.
     if (verbose > 0){
-      std::cout << "\tPMT1= " << v3 << " V" << std::endl;
+      std::cout << "\tPMT1= " << v1 << " V" << std::endl;
       std::cout << "\tPMT2= " << v2 << " V" << std::endl;
-      std::cout << "\tPMT3= " << v4 << " V" << std::endl;
-      std::cout << "\tPMT4= " << v1 << " V" << std::endl;
+      std::cout << "\tPMT3= " << v3 << " V" << std::endl;
+      std::cout << "\tPMT4= " << v4 << " V" << std::endl;
     }
     m_pwrled->setVchannel(0, v3, verbose);
     m_pwrled->setVchannel(1, v2, verbose);

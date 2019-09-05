@@ -77,6 +77,8 @@ int main(int /*argc*/, char **argv) {
         std::cout << "Enter 'c' to continue" << std::endl;
         int k;
         std::cin >> k;
+        std::cin.clear();
+        std::cin.ignore(512, '\n');
     }
 
     double thresholdDifference = thresholdMax - thresholdMin;
@@ -95,6 +97,8 @@ int main(int /*argc*/, char **argv) {
         std::cout << "Enter 'c' to continue" << std::endl;
         int k;
         std::cin >> k;
+        std::cin.clear();
+        std::cin.ignore(512, '\n');
     }
 
     int numThresholdValues;
@@ -105,10 +109,10 @@ int main(int /*argc*/, char **argv) {
     // Pre Run:
     ///////////////////////////////////////////////
     int preRun = 1;
+    int iterations = 1;
     while (preRun == 1){
         numThresholdValues = numThresholdValues1;
-        time = time1;
-        int iterations = 1;
+        time = time1;        
         // create array of threshold
         std::vector<double> thresholds(numThresholdValues);
 
@@ -154,15 +158,30 @@ int main(int /*argc*/, char **argv) {
         std::cout << "Do you want to change the voltages and rerun the measurement?" << std::endl;
         int decision;
         std::cin >> decision;
+        std::cin.clear();
+        std::cin.ignore(512, '\n');
         if (decision > 0){
+            double v0,v1,v2,v3;
             std::cout << "Enter v1" << std::endl;
-            std::cin >> voltage[0];
+            std::cin >> v0;
+            std::cin.clear();
+            std::cin.ignore(512, '\n');
+            voltage[0] = v0;
             std::cout << "Enter v2" << std::endl;
-            std::cin >> voltage[1];
+            std::cin >> v1;
+            std::cin.clear();
+            std::cin.ignore(512, '\n');
+            voltage[1] = v1;
             std::cout << "Enter v3" << std::endl;
-            std::cin >> voltage[2];
+            std::cin >> v2;
+            std::cin.clear();
+            std::cin.ignore(512, '\n');
+            voltage[2] = v2;
             std::cout << "Enter v4" << std::endl;
-            std::cin >> voltage[3];
+            std::cin >> v3;
+            std::cin.clear();
+            std::cin.ignore(512, '\n');
+            voltage[3] = v3;
             iterations++;
         }
         else preRun = 0;
